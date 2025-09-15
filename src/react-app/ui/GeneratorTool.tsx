@@ -30,15 +30,14 @@ const materialSchema = {
 };
 
 export const GeneratorTool: React.FC = () => {
-    const [apiKey, setApiKey] = useState('');
     const [prompt, setPrompt] = useState('A glowing, crystalline plant that pulses with energy.');
     const [generatedJson, setGeneratedJson] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
 
     const generateMaterial = async () => {
-        if (!apiKey.trim()) {
-            setError('Please enter a valid Gemini API Key.');
+        if (!process.env.API_KEY) {
+            setError('API_KEY environment variable not set.');
             return;
         }
 
@@ -47,7 +46,7 @@ export const GeneratorTool: React.FC = () => {
         setGeneratedJson('');
 
         try {
-            const ai = new GoogleGenAI({ apiKey });
+            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
             
             const response = await ai.models.generateContent({
                 model: "gemini-2.5-flash",
@@ -77,20 +76,13 @@ export const GeneratorTool: React.FC = () => {
         <div className="generator-tool">
             <h3>AI Material Generator</h3>
             <p>Describe a new crafting material.</p>
-            <input 
-                type="password"
-                placeholder="Enter your Gemini API Key here"
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-                style={{ width: '100%', padding: '8px', marginBottom: '12px' }}
-            />
             <textarea
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
                 rows={3}
                 placeholder="e.g., A petrified, glowing mushroom."
             />
-            <button onClick={generateMaterial} disabled={isLoading || !prompt.trim() || !apiKey.trim()}>
+            <button onClick={generateMaterial} disabled={isLoading || !prompt.trim()}>
                 {isLoading ? 'Generating...' : 'Generate'}
             </button>
 
