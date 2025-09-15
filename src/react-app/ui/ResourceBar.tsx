@@ -1,19 +1,17 @@
 import React from 'react';
 import { useGameStore } from '../../engine/store';
 
-// GDD Section 9.2: Heads-Up Display (HUD) -> Top Bar
-// "Tampilan sumber daya utama (Power, Biomass, Alloys, Components, Pawn Count)"
+// GDD Section 9.2: Heads-Up Display (HUD) -> Top-Left
+// "Resource indicators (e.g., Materials, Power, etc.)"
 
 export const ResourceBar: React.FC = () => {
-    const { resources, pawnCount } = useGameStore();
+    const materials = useGameStore((state) => state.materials);
+    const inventory = useGameStore((state) => state.inventory);
 
     return (
-        <div className="resource-bar" aria-label="Game Resources">
-            <div className="resource-item">⚡ Power: {resources.power}</div>
-            <div className="resource-item">🌿 Biomass: {resources.biomass}</div>
-            <div className="resource-item">🔩 Alloys: {resources.alloys}</div>
-            <div className="resource-item">⚙️ Components: {resources.components}</div>
-            <div className="resource-item">👤 Pawns: {pawnCount}</div>
+        <div className="resource-bar">
+            <span>Materials: {materials.length}</span>
+            <span>Crafted Items: {inventory.length}</span>
         </div>
     );
 };

@@ -1,73 +1,70 @@
-
-import React, { useRef, useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import * as PIXI from 'pixi.js';
 import { getPixiApp } from './pixiApp';
-import { useGameInput } from './hooks/useGameInput';
-import { loadGameAssets } from './assetManager';
-import { tickDneEngine } from '../engine/dneEngine';
 import { useGameStore } from '../engine/store';
+import { loadGameAssets } from './assetManager';
+import { Simulation } from '../engine/simulation';
+
+// GDD Section 7.2: Rendering Engine - PixiJS
+// This component is the bridge between React and the PixiJS canvas.
 
 export const Game: React.FC = () => {
-    const pixiContainer = useRef<HTMLDivElement>(null);
-    useGameInput(); // Activate keyboard controls
+    const canvasRef = useRef<HTMLDivElement>(null);
+    const simulationRef = useRef<Simulation | null>(null);
 
     useEffect(() => {
-        const container = pixiContainer.current;
-        if (!container) return;
+        let pixiApp = getPixiApp();
+        let sim: Simulation;
 
-        const app = getPixiApp();
-        let isAppMounted = false;
+        const init = async () => {
+            if (!canvasRef.current) return;
+            
+            // Append the PixiJS view to the DOM
+            canvasRef.current.appendChild(pixiApp.view as unknown as Node);
 
-        const initPixi = async () => {
-            try {
-                await loadGameAssets();
-                
-                if (pixiContainer.current) {
-                    container.appendChild(app.view as HTMLCanvasElement);
-                    isAppMounted = true;
-                    app.start();
+            // Load assets before starting the simulation
+            await loadGameAssets();
+            
+            // Start the simulation
+            sim = new Simulation(pixiApp);
+            simulationRef.current = sim;
 
-                    // --- Game Loop Integration ---
-                    const gameLoop = (delta: PIXI.Ticker) => {
-                        const { isPaused, timeScale } = useGameStore.getState();
-                        if (isPaused) return;
+            // Start the game loop
+            pixiApp.ticker.add(gameLoop);
+        };
 
-                        const adjustedDelta = delta.deltaTime * timeScale;
-                        
-                        // Call all engine ticks here
-                        tickDneEngine();
-                        // Other systems like pawn movement, resource generation would be ticked here...
-                    };
+        const gameLoop = (ticker: PIXI.Ticker) => {
+            // PIXI.Ticker.deltaTime is in frames, we need it in seconds for the store
+            const deltaInSeconds = ticker.deltaMS / 1000;
+            useGameStore.getState().actions.gameTick(deltaInSeconds);
 
-                    app.ticker.add(gameLoop);
-
-                    // Cleanup ticker on unmount
-                    return () => {
-                        app.ticker.remove(gameLoop);
-                    };
-                }
-            } catch (error) {
-                console.error("Failed to initialize PixiJS app:", error);
+            // Update the simulation visuals
+            if (simulationRef.current) {
+                simulationRef.current.update();
             }
         };
 
-        let cleanupTicker: (() => void) | undefined;
-        initPixi().then(cleanup => {
-            cleanupTicker = cleanup;
-        });
+        init();
 
         return () => {
-            if (cleanupTicker) {
-                cleanupTicker();
+            // Cleanup on component unmount
+            if (pixiApp) {
+                pixiApp.ticker.remove(gameLoop);
             }
-            if (isAppMounted && container.contains(app.view as HTMLCanvasElement)) {
-                app.stop();
-                container.removeChild(app.view as HTMLCanvasElement);
+            if (simulationRef.current) {
+                simulationRef.current.destroy();
+            }
+            // Note: We don't destroy the pixiApp itself as it's a singleton.
+            // In a more complex app with scene changes, you might handle this differently.
+            if (canvasRef.current && pixiApp.view) {
+                 try {
+                    canvasRef.current.removeChild(pixiApp.view as unknown as Node);
+                } catch (e) {
+                    // It might already be gone
+                }
             }
         };
     }, []);
 
-    // The canvas container no longer forces itself to be in the background.
-    // CSS will manage the layering correctly.
-    return <div ref={pixiContainer} className="pixi-container" style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }} />;
+    return <div ref={canvasRef} className="game-canvas-container" />;
 };

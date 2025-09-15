@@ -1,4 +1,5 @@
 
+
 import React, { useState, useCallback } from 'react';
 import { useGameStore } from '../../engine/store';
 import { ItemPreview } from './ItemPreview';
@@ -112,8 +113,9 @@ export const LegacyScreen: React.FC = () => {
                         <ItemPreview item={lastCraftedItem} />
                         {lastCraftedItem && (
                             <div className="stats">
+                                {/* FIX: Explicitly convert stat values to strings to prevent rendering errors. */}
                                 {Object.entries(lastCraftedItem.finalStats).map(([key, value]) => (
-                                    <p key={key}><strong>{key}:</strong> {value}</p>
+                                    <p key={key}><strong>{key}:</strong> {String(value)}</p>
                                 ))}
                             </div>
                         )}

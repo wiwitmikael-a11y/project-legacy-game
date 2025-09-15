@@ -1,69 +1,113 @@
-
-// GDD Section 8.2: State Management - Zustand
-// "A central, reactive state store should be used. Zustand is preferred for its simplicity."
-
 import { create } from 'zustand';
-import { GameState, GameActions, DilemmaChoice, SynthesizedItem } from './types';
+import { Blueprint, Material, SynthesizedItem, Dilemma, DilemmaChoice, Pawn } from './types';
 import { INITIAL_BLUEPRINTS, INITIAL_MATERIALS } from './data';
 import { synthesizeItem } from './baseEngine';
+import { eventBus } from './eventBus';
+import { generateDilemma } from './dneEngine';
+import { updatePawns, PAWNS } from './pawnEngine';
 
-type StoreState = GameState & {
-    actions: GameActions;
-};
+// GDD Section 8.2: Centralized State Management (Zustand)
+// "All global game state will be managed by a central store..."
 
-export const useGameStore = create<StoreState>((set, get) => ({
-    // GDD Section 9.2: HUD -> Default Values
-    // "Game should start with a baseline of resources."
-    isPaused: false,
+interface GameState {
+    // Game Time & Control
+    isPaused: boolean;
+    timeScale: number;
+    gameTime: number;
+
+    // Resources & Crafting
+    materials: Material[];
+    inventory: SynthesizedItem[];
+    blueprints: Blueprint[];
+    
+    // UI State
+    showLegacyScreen: boolean;
+    showGeneratorTool: boolean;
+
+    // DNE System
+    activeDilemma: Dilemma | null;
+    
+    // Pawns
+    pawns: Pawn[];
+
+    // Actions
+    actions: {
+        togglePause: () => void;
+        setTimeScale: (scale: number) => void;
+        gameTick: (delta: number) => void;
+
+        toggleLegacyScreen: () => void;
+        toggleGeneratorTool: () => void;
+
+        craftItem: (blueprintId: string, selectedMaterials: Record<string, string>) => SynthesizedItem | null;
+        
+        resolveDilemma: (choice: DilemmaChoice) => void;
+        triggerDilemma: () => void;
+    };
+}
+
+export const useGameStore = create<GameState>((set, get) => ({
+    isPaused: true,
     timeScale: 1,
-    resources: {
-        power: 1000,
-        biomass: 500,
-        alloys: 250,
-        components: 50,
-    },
-    pawnCount: 5,
-    currentDilemma: null,
-    isLegacyScreenOpen: false,
-    isGeneratorToolOpen: false, // New state for dev tools
-
-    // GDD BASE System: Initial crafting data
-    blueprints: INITIAL_BLUEPRINTS,
+    gameTime: 0,
     materials: INITIAL_MATERIALS,
     inventory: [],
+    blueprints: INITIAL_BLUEPRINTS,
+    showLegacyScreen: false,
+    showGeneratorTool: false,
+    activeDilemma: null,
+    pawns: PAWNS,
 
     actions: {
-        togglePause: () => set(state => ({ isPaused: !state.isPaused })),
-        setTimeScale: (scale: number) => set({ timeScale: scale }),
-        presentDilemma: (dilemma) => set({ currentDilemma: dilemma }),
-        resolveDilemma: (choice: DilemmaChoice) => {
-             // In a real game, the 'consequence' string would trigger another system.
-             // For now, we just log it and close the modal.
-            console.log(`Choice made: ${choice.text}, Consequence: ${choice.consequence}`);
-            set({ currentDilemma: null });
-        },
-        toggleLegacyScreen: () => set(state => ({ isLegacyScreenOpen: !state.isLegacyScreenOpen })),
-        toggleGeneratorTool: () => set(state => ({ isGeneratorToolOpen: !state.isGeneratorToolOpen })), // New action for dev tools
-        
-        craftItem: (blueprintId: string, selectedMaterials: Record<string, string>): SynthesizedItem | null => {
-            const { blueprints, materials, inventory } = get();
-            const blueprint = blueprints.find(bp => bp.id === blueprintId);
+        togglePause: () => set((state) => ({ isPaused: !state.isPaused })),
+        setTimeScale: (scale) => set({ timeScale: scale, isPaused: false }),
+        gameTick: (delta) => {
+            const { isPaused, timeScale, pawns, gameTime } = get();
+            if (isPaused) return;
 
+            const effectiveDelta = delta * timeScale;
+            
+            // Update pawns
+            const updatedPawns = updatePawns(pawns, effectiveDelta);
+
+            // Occasionally trigger a dilemma
+            if (Math.random() < 0.001) {
+                get().actions.triggerDilemma();
+            }
+
+            set({ gameTime: gameTime + effectiveDelta, pawns: updatedPawns });
+        },
+
+        toggleLegacyScreen: () => set((state) => ({ showLegacyScreen: !state.showLegacyScreen })),
+        toggleGeneratorTool: () => set((state) => ({ showGeneratorTool: !state.showGeneratorTool })),
+
+        craftItem: (blueprintId, selectedMaterials) => {
+            const { blueprints, materials } = get();
+            const blueprint = blueprints.find(bp => bp.id === blueprintId);
             if (!blueprint) {
-                console.error(`Blueprint with id ${blueprintId} not found for crafting.`);
+                console.error("Blueprint not found for crafting");
                 return null;
             }
 
-            // The core synthesis logic is in a separate, testable engine file.
             const newItem = synthesizeItem(blueprint, selectedMaterials, materials);
-
             if (newItem) {
-                set({ inventory: [...inventory, newItem] });
-                console.log('Crafted new item:', newItem);
-                return newItem; // Return the new item on success
-            } else {
-                console.error('Crafting failed.');
-                return null; // Return null on failure
+                set(state => ({ inventory: [...state.inventory, newItem] }));
+                eventBus.emit('blueprint:discovered', { name: newItem.blueprintName }); // Example event
+            }
+            return newItem;
+        },
+        
+        resolveDilemma: (choice) => {
+            console.log(`Dilemma resolved with choice: ${choice.text}`);
+            // In a real game, the choice would have consequences.
+            set({ activeDilemma: null });
+        },
+
+        triggerDilemma: () => {
+            if (get().activeDilemma) return; // Don't show a new one if one is active
+            const newDilemma = generateDilemma(get());
+            if (newDilemma) {
+                set({ activeDilemma: newDilemma, isPaused: true });
             }
         },
     }

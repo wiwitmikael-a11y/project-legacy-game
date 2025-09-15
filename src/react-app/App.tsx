@@ -1,27 +1,42 @@
-
 import React from 'react';
+import { useGameStore } from '../engine/store';
 import { Game } from './Game';
 import { HUD } from './ui/HUD';
-import { DilemmaModal } from './ui/DilemmaModal';
 import { LegacyScreen } from './ui/LegacyScreen';
-import { useGameStore } from '../engine/store';
+import { DilemmaModal } from './ui/DilemmaModal';
 import { GeneratorTool } from './ui/GeneratorTool';
+import { PawnStatusPanel } from './ui/PawnStatusPanel';
+import { useGameInput } from './hooks/useGameInput';
 
-// GDD Section 9.0: Application Shell
-// This is the root React component that assembles the entire UI.
+// GDD Section 7.1: Technology Stack - React
+// This is the root component of the React application. It orchestrates all other UI components.
 
 export const App: React.FC = () => {
-    const { currentDilemma, isLegacyScreenOpen, isGeneratorToolOpen } = useGameStore();
+    const showLegacyScreen = useGameStore((state) => state.showLegacyScreen);
+    const showGeneratorTool = useGameStore((state) => state.showGeneratorTool);
+    const activeDilemma = useGameStore((state) => state.activeDilemma);
+
+    // Initialize keyboard controls
+    useGameInput();
 
     return (
-        <main className="app-container">
+        <div className="app-container">
             <Game />
             <HUD />
-
-            {/* Conditional Overlays */}
-            {currentDilemma && <DilemmaModal dilemma={currentDilemma} />}
-            {isLegacyScreenOpen && <LegacyScreen />}
-            {isGeneratorToolOpen && <GeneratorTool />}
-        </main>
+            <PawnStatusPanel />
+            
+            {/* Overlays */}
+            {showLegacyScreen && <LegacyScreen />}
+            {activeDilemma && <DilemmaModal dilemma={activeDilemma} />}
+            
+            {/* Dev Tools Panel */}
+            {showGeneratorTool && (
+                <div className="overlay-screen dev-tool-panel">
+                    <div className="dev-tool-container">
+                         <GeneratorTool />
+                    </div>
+                </div>
+            )}
+        </div>
     );
 };
