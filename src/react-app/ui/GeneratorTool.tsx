@@ -1,14 +1,9 @@
 import React, { useState } from 'react';
-// FIX: Import Gemini API client and types.
 import { GoogleGenAI, Type } from "@google/genai";
 
 // GDD Section Dev Tools: Content Generator
 // A tool for designers (or players) to generate new game content using AI.
 
-// FIX: Initialize the Gemini API client.
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-
-// FIX: Define the response schema for the material object.
 const materialSchema = {
     type: Type.OBJECT,
     properties: {
@@ -35,18 +30,25 @@ const materialSchema = {
 };
 
 export const GeneratorTool: React.FC = () => {
+    const [apiKey, setApiKey] = useState('');
     const [prompt, setPrompt] = useState('A glowing, crystalline plant that pulses with energy.');
     const [generatedJson, setGeneratedJson] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
 
     const generateMaterial = async () => {
+        if (!apiKey.trim()) {
+            setError('Please enter a valid Gemini API Key.');
+            return;
+        }
+
         setIsLoading(true);
         setError('');
         setGeneratedJson('');
 
         try {
-            // FIX: Replaced mock function with a call to the Gemini API.
+            const ai = new GoogleGenAI({ apiKey });
+            
             const response = await ai.models.generateContent({
                 model: "gemini-2.5-flash",
                 contents: `Generate a new crafting material for a sci-fi game based on this description: "${prompt}"`,
@@ -75,13 +77,20 @@ export const GeneratorTool: React.FC = () => {
         <div className="generator-tool">
             <h3>AI Material Generator</h3>
             <p>Describe a new crafting material.</p>
+            <input 
+                type="password"
+                placeholder="Enter your Gemini API Key here"
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                style={{ width: '100%', padding: '8px', marginBottom: '12px' }}
+            />
             <textarea
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
                 rows={3}
                 placeholder="e.g., A petrified, glowing mushroom."
             />
-            <button onClick={generateMaterial} disabled={isLoading || !prompt.trim()}>
+            <button onClick={generateMaterial} disabled={isLoading || !prompt.trim() || !apiKey.trim()}>
                 {isLoading ? 'Generating...' : 'Generate'}
             </button>
 

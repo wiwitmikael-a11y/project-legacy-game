@@ -16,9 +16,15 @@ export class Simulation {
 
     private initialize(): void {
         // Subscribe to game state changes to create/destroy sprites
+        // FIX: The base `subscribe` method from zustand expects a single listener callback, not a selector and a listener.
+        // The listener is fired on every state change, so we compare the `pawns` slice of state to avoid unnecessary updates.
         useGameStore.subscribe(
-            (state) => state.pawns,
-            (pawns) => this.syncPawnSprites(pawns)
+            (state, prevState) => {
+                // Only update sprites if the pawns array has changed.
+                if (state.pawns !== prevState.pawns) {
+                    this.syncPawnSprites(state.pawns);
+                }
+            }
         );
         // Initial sync
         this.syncPawnSprites(useGameStore.getState().pawns);
