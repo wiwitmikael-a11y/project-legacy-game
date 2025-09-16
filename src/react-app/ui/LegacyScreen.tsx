@@ -1,9 +1,8 @@
-
-
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { useGameStore } from '../../engine/store';
 import { ItemPreview } from './ItemPreview';
 import { Blueprint, Material, SynthesizedItem } from '../../engine/types';
+import { synthesizeItem } from '../../engine/baseEngine';
 
 export const LegacyScreen: React.FC = () => {
     const { toggleLegacyScreen, craftItem } = useGameStore((state) => state.actions);
@@ -15,7 +14,7 @@ export const LegacyScreen: React.FC = () => {
     const [activeDropZone, setActiveDropZone] = useState<string | null>(null);
     const [lastCraftedItem, setLastCraftedItem] = useState<SynthesizedItem | null>(null);
 
-    const selectedBlueprint = blueprints.find(bp => bp.id === selectedBlueprintId);
+    const selectedBlueprint = useMemo(() => blueprints.find(bp => bp.id === selectedBlueprintId), [blueprints, selectedBlueprintId]);
 
     const handleCraft = () => {
         if (!selectedBlueprint) return;
@@ -56,11 +55,24 @@ export const LegacyScreen: React.FC = () => {
         setLastCraftedItem(null);
     };
 
-    const isCraftable = selectedBlueprint && selectedBlueprint.slots.every(slot => selectedMaterials[slot.id]);
+    const isCraftable = useMemo(() => {
+        return selectedBlueprint && selectedBlueprint.slots.every(slot => selectedMaterials[slot.id]);
+    }, [selectedBlueprint, selectedMaterials]);
+
+    // The preview is generated on-the-fly whenever the inputs change,
+    // giving the player instant feedback without having to click "Synthesize".
+    const previewItem = useMemo<SynthesizedItem | null>(() => {
+        if (!isCraftable || !selectedBlueprint) {
+            return null;
+        }
+        // We can call synthesizeItem directly because it's a pure function.
+        // It doesn't modify the game state, just calculates the result.
+        return synthesizeItem(selectedBlueprint, selectedMaterials, materials);
+    }, [isCraftable, selectedBlueprint, selectedMaterials, materials]);
 
     return (
         <div className="overlay-screen legacy-screen">
-            <div className="legacy-container">
+            <div className="overlay-content-container legacy-container">
                 <h2>Legacy System - Item Synthesis</h2>
                 <div className="crafting-interface">
                     <div className="inventory-panel">
@@ -110,11 +122,16 @@ export const LegacyScreen: React.FC = () => {
 
                     <div className="result-panel">
                         <h4>Result Preview</h4>
-                        <ItemPreview item={lastCraftedItem} />
-                        {lastCraftedItem && (
+                        <ItemPreview item={previewItem} />
+                        {(previewItem || lastCraftedItem) && (
                             <div className="stats">
-                                {/* FIX: Explicitly convert stat values to strings to prevent rendering errors. */}
-                                {Object.entries(lastCraftedItem.finalStats).map(([key, value]) => (
+                                {/* 
+                                  This logic provides a better user experience. It shows the live preview
+                                  of the item being configured. If the user then removes a material, 
+                                  the preview disappears, but the stats of the *last successfully crafted item* 
+                                  remain visible, preventing the panel from feeling empty.
+                                */}
+                                {Object.entries((previewItem || lastCraftedItem)!.finalStats).map(([key, value]) => (
                                     <p key={key}><strong>{key}:</strong> {String(value)}</p>
                                 ))}
                             </div>

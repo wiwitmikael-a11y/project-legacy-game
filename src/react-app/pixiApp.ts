@@ -1,6 +1,7 @@
 // GDD Section 7.2: Rendering Engine - PixiJS
 // This file initializes and exports a singleton PixiJS application instance.
-// Using a lazy-initialized singleton to prevent "Script error" on initial load.
+// The app is lazy-initialized via getPixiApp() to ensure it's only created after the DOM is ready.
+// Creating it prematurely could lead to a generic "Script error" if the canvas element isn't available yet.
 
 import * as PIXI from 'pixi.js';
 

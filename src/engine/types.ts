@@ -1,6 +1,5 @@
-// GDD Section BASE System: Data structures for crafting.
-// GDD Section DNE System: Data structure for dilemmas.
-// GDD Section Pawns: Data structure for characters.
+// GDD Section 8.1: Data Structures
+// Centralized type definitions for the entire game engine.
 
 export interface Material {
     id: string;
@@ -18,16 +17,16 @@ export interface BlueprintSlot {
 export interface SpriteLayer {
     id: string;
     spriteId: string;
-    color: number;
+    color: number; // Hex color
     emissive?: boolean;
 }
 
 export interface Blueprint {
-    id: string;
+    id:string;
     name: string;
     description: string;
     slots: BlueprintSlot[];
-    baseStats: Record<string, string | number>;
+    baseStats: Record<string, any>;
     baseSpriteLayers: SpriteLayer[];
 }
 
@@ -36,18 +35,16 @@ export interface SynthesizedItem {
     blueprintId: string;
     blueprintName: string;
     materials: Record<string, string>; // slotId -> materialId
-    finalStats: Record<string, string | number>;
+    finalStats: Record<string, any>;
     visualLayers: SpriteLayer[];
 }
 
-
 export interface DilemmaChoice {
     text: string;
-    // Potentially add effect callbacks or identifiers here
+    // Add effect properties if needed later
 }
 
 export interface Dilemma {
-    id: string;
     title: string;
     description: string;
     choices: DilemmaChoice[];
@@ -56,5 +53,10 @@ export interface Dilemma {
 export interface Pawn {
     id: string;
     name: string;
-    status: 'Idle' | 'Working' | 'Injured' | 'Dead';
+    hp: number;
+    maxHp: number;
+    status: 'idle' | 'working' | 'injured';
+    // Position on the map
+    x: number;
+    y: number;
 }

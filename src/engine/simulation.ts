@@ -3,86 +3,110 @@ import { useGameStore } from './store';
 import { Pawn } from './types';
 
 // GDD Section 7.2: Rendering Engine - PixiJS
-// This class manages the visual representation of the game state on the PixiJS stage.
+// "The simulation layer will be responsible for translating game state into visual representation on the PixiJS stage."
 
 export class Simulation {
     private app: PIXI.Application;
-    private pawnSprites: Map<string, PIXI.Text> = new Map();
+    private pawnSprites: Map<string, PIXI.Graphics> = new Map();
+    private unsubscribe: () => void;
 
     constructor(app: PIXI.Application) {
         this.app = app;
-        this.initialize();
-    }
 
-    private initialize(): void {
-        // Subscribe to game state changes to create/destroy sprites
-        // FIX: The base `subscribe` method from zustand expects a single listener callback, not a selector and a listener.
-        // The listener is fired on every state change, so we compare the `pawns` slice of state to avoid unnecessary updates.
-        useGameStore.subscribe(
+        // Subscribe to pawn state changes to add/remove sprites.
+        this.unsubscribe = useGameStore.subscribe(
             (state, prevState) => {
-                // Only update sprites if the pawns array has changed.
+                // A shallow compare is enough since the pawnEngine creates a new array.
                 if (state.pawns !== prevState.pawns) {
                     this.syncPawnSprites(state.pawns);
                 }
             }
         );
+
         // Initial sync
         this.syncPawnSprites(useGameStore.getState().pawns);
     }
-    
-    // Create, update, and remove sprites to match the pawn state
-    private syncPawnSprites(pawns: Pawn[]): void {
-        const existingPawnIds = new Set(this.pawnSprites.keys());
-        
-        pawns.forEach((pawn, index) => {
-            let sprite = this.pawnSprites.get(pawn.id);
 
-            if (!sprite) {
-                // Create new sprite for new pawn
-                sprite = new PIXI.Text(`${pawn.name}\n[${pawn.status}]`, {
-                    fontFamily: 'Arial',
-                    fontSize: 14,
-                    fill: 0xffffff,
-                    align: 'center',
-                });
-                sprite.anchor.set(0.5);
-                sprite.x = 100 + index * 120;
-                sprite.y = 100;
-                this.app.stage.addChild(sprite);
+    /**
+     * Ensures the PIXI stage has a sprite for each pawn and removes sprites for pawns that no longer exist.
+     */
+    private syncPawnSprites(pawns: Pawn[]) {
+        const pawnIds = new Set(pawns.map(p => p.id));
+
+        // Add new sprites
+        for (const pawn of pawns) {
+            if (!this.pawnSprites.has(pawn.id)) {
+                const sprite = new PIXI.Graphics();
+                // We will set the color in the update loop
+                sprite.x = pawn.x;
+                sprite.y = pawn.y;
+
                 this.pawnSprites.set(pawn.id, sprite);
-            } else {
-                // Update existing sprite
-                 sprite.text = `${pawn.name}\n[${pawn.status}]`;
+                this.app.stage.addChild(sprite);
             }
-            
-            // Remove from the set of pawns to be deleted
-            existingPawnIds.delete(pawn.id);
-        });
+        }
 
-        // Remove sprites for pawns that no longer exist
-        existingPawnIds.forEach(pawnId => {
-            const sprite = this.pawnSprites.get(pawnId);
-            if (sprite) {
+        // Remove old sprites
+        for (const [id, sprite] of this.pawnSprites.entries()) {
+            if (!pawnIds.has(id)) {
                 this.app.stage.removeChild(sprite);
                 sprite.destroy();
-                this.pawnSprites.delete(pawnId);
+                this.pawnSprites.delete(id);
             }
-        });
+        }
     }
 
-    // This method is called every frame from the main game loop
+    /**
+     * The main update loop called by the PIXI ticker.
+     * It reads the latest game state and updates the positions/visuals of sprites.
+     */
     public update(): void {
-        // Here you would add continuous visual updates, like movement animations.
-        // For this simple example, most updates are state-driven via the store subscription.
-        this.pawnSprites.forEach(sprite => {
-            // e.g., make them bob up and down slightly
-            sprite.y += Math.sin(Date.now() / 200 + sprite.x) * 0.1;
-        });
+        const pawns = useGameStore.getState().pawns;
+        for (const pawn of pawns) {
+            const sprite = this.pawnSprites.get(pawn.id);
+            if (sprite) {
+                // Animate position smoothly towards target
+                sprite.x += (pawn.x - sprite.x) * 0.1;
+                sprite.y += (pawn.y - sprite.y) * 0.1;
+                
+                // Update color based on status and health
+                let color = 0x00ff00; // Default to green (idle)
+                if (pawn.status === 'working') {
+                    color = 0x00aaff; // Light blue for working
+                } else if (pawn.status === 'injured') {
+                    color = 0xffa500; // Orange for injured
+                }
+
+                // Health override: As HP drops, tint it red
+                const healthRatio = pawn.hp / pawn.maxHp;
+                if (healthRatio < 0.3) {
+                    color = 0xff0000; // Critical health is red
+                } else if (healthRatio < 0.6 && pawn.status !== 'working') {
+                    // Don't override working color unless critical
+                    color = 0xffa500; // Low health is orange
+                }
+
+                // Redraw the sprite with the new color and size
+                sprite.clear();
+                sprite.beginFill(color);
+                sprite.drawCircle(0, 0, 10);
+                sprite.endFill();
+            }
+        }
     }
 
+    /**
+     * Cleans up resources when the simulation is no longer needed.
+     */
     public destroy(): void {
-        // Clean up all sprites and containers from the stage
-        this.app.stage.removeChildren();
+        // Unsubscribe from the store to prevent memory leaks
+        this.unsubscribe();
+
+        // Clean up all sprites from the stage
+        for (const sprite of this.pawnSprites.values()) {
+            this.app.stage.removeChild(sprite);
+            sprite.destroy();
+        }
         this.pawnSprites.clear();
     }
 }

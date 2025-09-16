@@ -1,56 +1,41 @@
 import { Dilemma } from './types';
-import { useGameStore } from './store';
 
-// GDD DNE System: The Dynamic Narrative Engine
-// "Generates emergent story events (dilemmas) based on game state."
+// GDD DNE System: Dynamic Narrative Engine
+// This engine is responsible for generating narrative events (dilemmas).
 
-type GameStateSnapshot = ReturnType<typeof useGameStore.getState>;
+/**
+ * Generates a new dilemma for the player based on the current game state.
+ * @param gameState The current state of the game.
+ * @returns A Dilemma object or null if no dilemma is triggered.
+ */
+export const generateDilemma = (gameState: any): Dilemma | null => {
+    // In a real implementation, this would be a complex system that analyzes the
+    // game state (e.g., low resources, recent events) to generate a relevant dilemma.
+    // For now, we'll return a simple, hardcoded dilemma.
 
-// A simple library of dilemma templates.
-const DILEMMA_TEMPLATES: ((state: GameStateSnapshot) => Dilemma | null)[] = [
-    (state) => {
-        if (state.materials.length > 5) {
-            return {
-                id: 'dilemma_resource_surplus',
-                title: 'Unexpected Surplus',
-                description: 'Our sensors detect a large, unstable cache of raw materials nearby. We could harvest it for a massive boost, but the energy signature is volatile and could damage our equipment.',
-                choices: [
-                    { text: 'Risk it for the materials.' },
-                    { text: 'Play it safe and ignore the cache.' },
-                ],
-            };
-        }
-        return null;
-    },
-    (state) => {
-        if (state.inventory.length > 2) {
-            return {
-                id: 'dilemma_strange_signal',
-                title: 'A Strange Signal',
-                description: 'A faint, repeating signal has been detected. It doesn\'t match any known friendly patterns. It could be a distress call, a trap, or just static.',
-                choices: [
-                    { text: 'Investigate the source of the signal.' },
-                    { text: 'Jam the signal and focus on our mission.' },
-                ],
-            };
-        }
-        return null;
-    },
-];
+    // Example logic: if the player has crafted items, present a dilemma.
+    if (gameState.inventory.length > 0 && Math.random() > 0.5) {
+        return {
+            title: 'Unexpected Surplus',
+            description: 'Your recent crafting successes have produced more than you need. A nearby settlement has offered to trade for your surplus. Do you accept?',
+            choices: [
+                { text: 'Trade for rare materials.' },
+                { text: 'Keep the items for emergencies.' },
+            ],
+        };
+    }
 
-
-export const generateDilemma = (state: GameStateSnapshot): Dilemma | null => {
-    // In a real DNE, this would be a complex system of triggers and conditions.
-    // For now, we'll just randomly pick a valid one.
-    
-    const possibleDilemmas = DILEMMA_TEMPLATES
-        .map(template => template(state))
-        .filter((d): d is Dilemma => d !== null);
-
-    if (possibleDilemmas.length === 0) {
-        return null;
+    // Another example.
+    if (Math.random() > 0.7) {
+        return {
+            title: 'Power Fluctuation',
+            description: 'A sudden power surge has been detected. You can try to harness the extra energy, but it risks damaging your equipment.',
+            choices: [
+                { text: 'Risk it for the extra power.' },
+                { text: 'Play it safe and shut down non-essential systems.' },
+            ],
+        };
     }
     
-    const randomIndex = Math.floor(Math.random() * possibleDilemmas.length);
-    return possibleDilemmas[randomIndex];
+    return null; // No dilemma triggered
 };

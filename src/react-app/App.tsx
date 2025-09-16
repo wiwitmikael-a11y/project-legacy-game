@@ -31,8 +31,8 @@ export const App: React.FC = () => {
             
             {/* Dev Tools Panel */}
             {showGeneratorTool && (
-                <div className="overlay-screen dev-tool-panel">
-                    <div className="dev-tool-container">
+                <div className="overlay-screen">
+                    <div className="overlay-content-container dev-tool-container">
                          <GeneratorTool />
                     </div>
                 </div>
